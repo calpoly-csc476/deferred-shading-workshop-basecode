@@ -61,7 +61,6 @@ public:
 	GLuint SceneNormalsTexture;
 	GLuint SceneDepthTexture;
 
-	vec3 g_light = vec3(1, 1, 1);
 	int g_width = -1;
 	int g_height = -1;
 
@@ -189,13 +188,6 @@ public:
 				break;
 			case GLFW_KEY_5:
 				cameraMoveSpeed = 24.f;
-				break;
-
-			case GLFW_KEY_Q:
-				g_light.x += 0.25;
-				break;
-			case GLFW_KEY_E:
-				g_light.x -= 0.25;
 				break;
 			}
 		}
@@ -472,7 +464,6 @@ public:
 		SceneProg->addUniform("P");
 		SceneProg->addUniform("M");
 		SceneProg->addUniform("V");
-		SceneProg->addUniform("lightDir");
 		SceneProg->addAttribute("vertPos");
 		SceneProg->addAttribute("vertNor");
 		SceneProg->addUniform("materialColor");
@@ -569,8 +560,6 @@ public:
 
 		SetProjectionMatrix(SceneProg);
 		SetView(SceneProg);
-
-		CHECKED_GL_CALL(glUniform3f(SceneProg->getUniform("lightDir"), g_light.x, g_light.y, g_light.z));
 
 		// draw the dog mesh
 		SetModel(vec3(-1, -0.75f, 0), 0, 1, SceneProg);
