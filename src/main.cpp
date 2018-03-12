@@ -40,7 +40,7 @@ public:
 
 	// Shaders
 	shared_ptr<Program> SceneProg;
-	shared_ptr<Program> SSAOProg;
+	shared_ptr<Program> DebugProg;
 
 	// Shapes
 	shared_ptr<Shape> sphere;
@@ -57,9 +57,6 @@ public:
 	GLuint SceneColorTexture;
 	GLuint SceneNormalsTexture;
 	GLuint SceneDepthTexture;
-
-	GLuint SSAONoiseTexture;
-	vector<float> ssaoKernel;
 
 	vec3 g_light = vec3(1, 1, 1);
 	int g_width = -1;
@@ -436,10 +433,10 @@ public:
 			exit(1);
 		}
 
-		SSAOProg = make_shared<Program>();
-		SSAOProg->setVerbose(true);
-		SSAOProg->setShaderNames(RESOURCE_DIR + "ssao_vert.glsl", RESOURCE_DIR + "ssao_frag.glsl");
-		if (! SSAOProg->init())
+		DebugProg = make_shared<Program>();
+		DebugProg->setVerbose(true);
+		DebugProg->setShaderNames(RESOURCE_DIR + "debug_vert.glsl", RESOURCE_DIR + "debug_frag.glsl");
+		if (! DebugProg->init())
 		{
 			exit(1);
 		}
@@ -456,69 +453,14 @@ public:
 		SceneProg->addAttribute("vertNor");
 		SceneProg->addUniform("materialColor");
 
-		SSAOProg->addUniform("sceneColorTex");
-		SSAOProg->addUniform("sceneNormalsTex");
-		SSAOProg->addUniform("sceneDepthTex");
-		SSAOProg->addUniform("noiseTex");
-		SSAOProg->addUniform("uMode");
-		SSAOProg->addUniform("P");
-		SSAOProg->addUniform("sampleVectors");
-		SSAOProg->addAttribute("vertPos");
+		DebugProg->addUniform("sceneColorTex");
+		DebugProg->addUniform("sceneNormalsTex");
+		DebugProg->addUniform("sceneDepthTex");
+		DebugProg->addUniform("uMode");
+		DebugProg->addUniform("P");
+		DebugProg->addAttribute("vertPos");
 
 		initGBuffer();
-		initSSAOKernel();
-	}
-
-	// simple linear interpolation helper function
-	static float lerp(float const a, float const b, float const f)
-	{
-		return a + f * (b - a);
-	}
-
-	// set up two sources of randomness for our SSAO implementation:
-	// 1) A set of random sample vectors within a unit hemisphere oriented +Z
-	// 2) A set of random 2D vectors that can be used to randomly rotate the hemisphere once aligned along the normal
-	void initSSAOKernel()
-	{
-		std::uniform_real_distribution<float> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
-		std::default_random_engine generator;
-
-		// Sample kernel - random vectors within unit hemisphere
-		int const numSamples = 64; // If you change this, you must update the shader as well!
-		for (uint i = 0; i < numSamples; ++i)
-		{
-			float const a = randomFloats(generator);
-			float const b = randomFloats(generator);
-			float const c = randomFloats(generator);
-
-			float const VerticalBias = 0.1f;
-			vec3 sample = vec3(a * 2 - 1, b * 2 - 1, c * (1 - VerticalBias) + VerticalBias);
-			sample = normalize(sample);
-			sample *= randomFloats(generator);
-
-			// Scale samples s.t. they're more aligned to center of kernel
-			float scale = float(i) / numSamples;
-			scale = lerp(0.1f, 1.0f, scale * scale);
-			sample *= scale;
-			ssaoKernel.push_back(sample.x);
-			ssaoKernel.push_back(sample.y);
-			ssaoKernel.push_back(sample.z);
-		}
-
-		// Noise texture - random vec2s for hemisphere orientation
-		vector<float> NoiseData;
-		uint const NoiseTexSize = 4;
-		for (uint i = 0; i < NoiseTexSize * NoiseTexSize; i++)
-		{
-			NoiseData.push_back(randomFloats(generator) * 2 - 1);
-			NoiseData.push_back(randomFloats(generator) * 2 - 1);
-		}
-
-		CHECKED_GL_CALL(glGenTextures(1, &SSAONoiseTexture));
-		CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SSAONoiseTexture));
-		CHECKED_GL_CALL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, NoiseTexSize, NoiseTexSize, 0, GL_RG, GL_FLOAT, NoiseData.data()));
-		CHECKED_GL_CALL(glGenerateMipmap(GL_TEXTURE_2D));
-		CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, 0));
 	}
 
 
@@ -639,22 +581,6 @@ public:
 		CHECKED_GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 		CHECKED_GL_CALL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 
-		SSAOProg->bind();
-		CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0));
-		CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SceneColorTexture));
-		CHECKED_GL_CALL(glUniform1i(SSAOProg->getUniform("sceneColorTex"), 0));
-
-		CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE1));
-		CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SceneNormalsTexture));
-		CHECKED_GL_CALL(glUniform1i(SSAOProg->getUniform("sceneNormalsTex"), 1));
-
-		CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE2));
-		CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SceneDepthTexture));
-		CHECKED_GL_CALL(glUniform1i(SSAOProg->getUniform("sceneDepthTex"), 2));
-
-		CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE3));
-		CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SSAONoiseTexture));
-		CHECKED_GL_CALL(glUniform1i(SSAOProg->getUniform("noiseTex"), 3));
 
 		int PassMode = 0;
 
@@ -671,14 +597,29 @@ public:
 			PassMode = 3;
 		}
 
-		CHECKED_GL_CALL(glUniform1i(SSAOProg->getUniform("uMode"), PassMode));
-		CHECKED_GL_CALL(glUniform3fv(SSAOProg->getUniform("sampleVectors"), (int) ssaoKernel.size() / 3, ssaoKernel.data()));
+		if (PassMode)
+		{
+			DebugProg->bind();
+			CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0));
+			CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SceneColorTexture));
+			CHECKED_GL_CALL(glUniform1i(DebugProg->getUniform("sceneColorTex"), 0));
 
-		SetProjectionMatrix(SSAOProg); // We need the projection matrix for a few things
+			CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE1));
+			CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SceneNormalsTexture));
+			CHECKED_GL_CALL(glUniform1i(DebugProg->getUniform("sceneNormalsTex"), 1));
 
-		CHECKED_GL_CALL(glBindVertexArray(QuadVertexArray));
-		CHECKED_GL_CALL(glDrawArrays(GL_TRIANGLES, 0, 6));
-		SSAOProg->unbind();
+			CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE2));
+			CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SceneDepthTexture));
+			CHECKED_GL_CALL(glUniform1i(DebugProg->getUniform("sceneDepthTex"), 2));
+
+			CHECKED_GL_CALL(glUniform1i(DebugProg->getUniform("uMode"), PassMode));
+
+			SetProjectionMatrix(DebugProg); // We need the projection matrix for a few things
+
+			CHECKED_GL_CALL(glBindVertexArray(QuadVertexArray));
+			CHECKED_GL_CALL(glDrawArrays(GL_TRIANGLES, 0, 6));
+			DebugProg->unbind();
+		}
 	}
 
 };
