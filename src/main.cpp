@@ -41,6 +41,7 @@ public:
 
 	// Shaders
 	shared_ptr<Program> SceneProg;
+	shared_ptr<Program> SceneTexProg;
 	shared_ptr<Program> LightProg;
 	shared_ptr<Program> DebugProg;
 
@@ -49,6 +50,9 @@ public:
 	shared_ptr<Shape> dog;
 	shared_ptr<Shape> dragon;
 	shared_ptr<Shape> stairs;
+	shared_ptr<Shape> tree;
+
+	shared_ptr<Texture> treeTexture;
 
 	// Debug Settings
 	bool ShowSceneColor = false;
@@ -431,12 +435,30 @@ public:
 		stairs->resize();
 		stairs->init();
 
+		tree = make_shared<Shape>();
+		tree->loadMesh(RESOURCE_DIR + "PineTree3.obj");
+		tree->resize();
+		tree->init();
+
+		treeTexture = make_shared<Texture>();
+		treeTexture->setFilename(RESOURCE_DIR + "PineTexture.png");
+		treeTexture->init();
+		treeTexture->setUnit(0);
+
 		// Initialize the GLSL programs
 
 		SceneProg = make_shared<Program>();
 		SceneProg->setVerbose(true);
 		SceneProg->setShaderNames(RESOURCE_DIR + "scene_vert.glsl", RESOURCE_DIR + "scene_frag.glsl");
 		if (! SceneProg->init())
+		{
+			exit(1);
+		}
+
+		SceneTexProg = make_shared<Program>();
+		SceneTexProg->setVerbose(true);
+		SceneTexProg->setShaderNames(RESOURCE_DIR + "sceneTex_vert.glsl", RESOURCE_DIR + "sceneTex_frag.glsl");
+		if (! SceneTexProg->init())
 		{
 			exit(1);
 		}
@@ -467,6 +489,14 @@ public:
 		SceneProg->addAttribute("vertPos");
 		SceneProg->addAttribute("vertNor");
 		SceneProg->addUniform("materialColor");
+
+		SceneTexProg->addUniform("P");
+		SceneTexProg->addUniform("M");
+		SceneTexProg->addUniform("V");
+		SceneTexProg->addAttribute("vertPos");
+		SceneTexProg->addAttribute("vertNor");
+		SceneTexProg->addAttribute("vertTex");
+		SceneTexProg->addUniform("materialTex");
 
 		LightProg->addUniform("sceneColorTex");
 		LightProg->addUniform("sceneNormalsTex");
@@ -589,6 +619,19 @@ public:
 		CHECKED_GL_CALL(glBindVertexArray(0));
 
 		SceneProg->unbind();
+
+
+		SceneTexProg->bind();
+
+		SetProjectionMatrix(SceneTexProg);
+		SetView(SceneTexProg);
+
+		// draw trees
+		SetModel(vec3(10, -0.5f, 0), 0, 5, SceneProg);
+		treeTexture->bind(SceneTexProg->getUniform("materialTex"));
+		tree->draw(SceneTexProg);
+
+		SceneTexProg->unbind();
 	}
 
 	void UpdateCamera(float const dT)
