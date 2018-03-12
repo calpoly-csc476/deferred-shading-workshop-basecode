@@ -156,12 +156,15 @@ void Shape::draw(const shared_ptr<Program> prog) const
 	glVertexAttribPointer(h_pos, 3, GL_FLOAT, GL_FALSE, 0, (const void *)0);
 
 	// Bind normal buffer
-	h_nor = prog->getAttribute("vertNor");
-	if (h_nor != -1 && norBufID != 0)
+	if (prog->isAttribute("vertNor"))
 	{
-		GLSL::enableVertexAttribArray(h_nor);
-		glBindBuffer(GL_ARRAY_BUFFER, norBufID);
-		glVertexAttribPointer(h_nor, 3, GL_FLOAT, GL_FALSE, 0, (const void *)0);
+		h_nor = prog->getAttribute("vertNor");
+		if (h_nor != -1 && norBufID != 0)
+		{
+			GLSL::enableVertexAttribArray(h_nor);
+			glBindBuffer(GL_ARRAY_BUFFER, norBufID);
+			glVertexAttribPointer(h_nor, 3, GL_FLOAT, GL_FALSE, 0, (const void *)0);
+		}
 	}
 
 	if (texBufID != 0 && prog->isAttribute("vertTex"))

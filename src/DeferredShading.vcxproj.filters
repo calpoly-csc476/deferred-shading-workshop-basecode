@@ -14,6 +14,7 @@
     <ClCompile Include="Shape.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="WindowManager.cpp" />
+    <ClCompile Include="Util.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ext">
@@ -32,5 +33,6 @@
     <ClInclude Include="Shape.h" />
     <ClInclude Include="Texture.h" />
     <ClInclude Include="WindowManager.h" />
+    <ClInclude Include="Util.h" />
   </ItemGroup>
 </Project>

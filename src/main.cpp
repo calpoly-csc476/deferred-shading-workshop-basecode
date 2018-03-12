@@ -24,6 +24,7 @@
 #include "Shape.h"
 #include "Texture.h"
 #include "WindowManager.h"
+#include "Util.h"
 
 
 using namespace std;
@@ -40,6 +41,7 @@ public:
 
 	// Shaders
 	shared_ptr<Program> SceneProg;
+	shared_ptr<Program> LightProg;
 	shared_ptr<Program> DebugProg;
 
 	// Shapes
@@ -52,6 +54,7 @@ public:
 	bool ShowSceneColor = false;
 	bool ShowSceneNormals = false;
 	bool ShowSceneDepth = false;
+	bool ShowScenePosition = false;
 
 	GLuint SceneFBO;
 	GLuint SceneColorTexture;
@@ -69,6 +72,16 @@ public:
 	// Screen Quad vertex data (for debugging)
 	GLuint QuadVertexArray;
 	GLuint QuadVertexBuffer;
+
+	struct Light
+	{
+		vec3 Position;
+		vec3 Color;
+		float T;
+	};
+
+	const int NumLights = 100;
+	vector<Light> Lights;
 
 
 	/////////////////
@@ -144,14 +157,17 @@ public:
 			moveRight = (action != GLFW_RELEASE);
 			break;
 
-		case GLFW_KEY_J:
+		case GLFW_KEY_H:
 			ShowSceneColor = (action != GLFW_RELEASE);
 			break;
-		case GLFW_KEY_K:
+		case GLFW_KEY_J:
 			ShowSceneNormals = (action != GLFW_RELEASE);
 			break;
-		case GLFW_KEY_L:
+		case GLFW_KEY_K:
 			ShowSceneDepth = (action != GLFW_RELEASE);
+			break;
+		case GLFW_KEY_L:
+			ShowScenePosition = (action != GLFW_RELEASE);
 			break;
 		};
 
@@ -433,6 +449,14 @@ public:
 			exit(1);
 		}
 
+		LightProg = make_shared<Program>();
+		LightProg->setVerbose(true);
+		LightProg->setShaderNames(RESOURCE_DIR + "light_vert.glsl", RESOURCE_DIR + "light_frag.glsl");
+		if (! LightProg->init())
+		{
+			exit(1);
+		}
+
 		DebugProg = make_shared<Program>();
 		DebugProg->setVerbose(true);
 		DebugProg->setShaderNames(RESOURCE_DIR + "debug_vert.glsl", RESOURCE_DIR + "debug_frag.glsl");
@@ -453,14 +477,41 @@ public:
 		SceneProg->addAttribute("vertNor");
 		SceneProg->addUniform("materialColor");
 
+		LightProg->addUniform("sceneColorTex");
+		LightProg->addUniform("sceneNormalsTex");
+		LightProg->addUniform("sceneDepthTex");
+		LightProg->addUniform("P");
+		LightProg->addUniform("V");
+		LightProg->addUniform("M");
+		LightProg->addUniform("lightColor");
+		LightProg->addUniform("lightPosition");
+		LightProg->addUniform("invP");
+		LightProg->addUniform("invV");
+		LightProg->addAttribute("vertPos");
+
 		DebugProg->addUniform("sceneColorTex");
 		DebugProg->addUniform("sceneNormalsTex");
 		DebugProg->addUniform("sceneDepthTex");
 		DebugProg->addUniform("uMode");
-		DebugProg->addUniform("P");
+		DebugProg->addUniform("invP");
+		DebugProg->addUniform("invV");
 		DebugProg->addAttribute("vertPos");
 
 		initGBuffer();
+
+		///////////////////////
+		// Initialize lights //
+		///////////////////////
+
+
+		for (int i = 0; i < NumLights; ++ i)
+		{
+			Light l;
+			l.Position = vec3(nrand() * 30.f, frand() * 0.5f, nrand() * 30.f);
+			l.Color = HSV(frand(), 1.f, 1.f);
+			l.T = frand() * 6.28f;
+			Lights.push_back(l);
+		}
 	}
 
 
@@ -469,19 +520,29 @@ public:
 	// Transforms //
 	////////////////
 
-	void SetProjectionMatrix(shared_ptr<Program> curShade)
+	mat4 SetProjectionMatrix(shared_ptr<Program> curShade)
 	{
 		int width, height;
 		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
 		float aspect = width / (float) height;
+
 		mat4 Projection = perspective(radians(50.0f), aspect, 0.1f, 100.0f);
-		CHECKED_GL_CALL(glUniformMatrix4fv(curShade->getUniform("P"), 1, GL_FALSE, value_ptr(Projection)));
+		
+		if (curShade)
+		{
+			CHECKED_GL_CALL(glUniformMatrix4fv(curShade->getUniform("P"), 1, GL_FALSE, value_ptr(Projection)));
+		}
+		return Projection;
 	}
 
-	void SetView(shared_ptr<Program> curShade)
+	mat4 SetView(shared_ptr<Program> curShade)
 	{
 		mat4 Cam = glm::lookAt(cameraPos, cameraLookAt, vec3(0, 1, 0));
-		CHECKED_GL_CALL(glUniformMatrix4fv(curShade->getUniform("V"), 1, GL_FALSE, value_ptr(Cam)));
+		if (curShade)
+		{
+			CHECKED_GL_CALL(glUniformMatrix4fv(curShade->getUniform("V"), 1, GL_FALSE, value_ptr(Cam)));
+		}
+		return Cam;
 	}
 
 	void SetModel(vec3 trans, float rotY, float sc, shared_ptr<Program> curS)
@@ -576,7 +637,7 @@ public:
 		DrawScene();
 
 
-		// Now do the SSAO pass - copy gbuffer values to screen + plus do SSAO calculation
+		// Now do the light pass - read gbuffer values to do illumination (or just copy values to screen for debug)
 
 		CHECKED_GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 		CHECKED_GL_CALL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
@@ -596,9 +657,15 @@ public:
 		{
 			PassMode = 3;
 		}
+		else if (ShowScenePosition)
+		{
+			PassMode = 4;
+		}
 
 		if (PassMode)
 		{
+			// Debug mode - just copy
+
 			DebugProg->bind();
 			CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0));
 			CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SceneColorTexture));
@@ -614,11 +681,54 @@ public:
 
 			CHECKED_GL_CALL(glUniform1i(DebugProg->getUniform("uMode"), PassMode));
 
-			SetProjectionMatrix(DebugProg); // We need the projection matrix for a few things
+			mat4 P = SetProjectionMatrix(nullptr);
+			mat4 V = SetView(nullptr);
+			mat4 invP = inverse(P);
+			mat4 invV = inverse(V);
+			CHECKED_GL_CALL(glUniformMatrix4fv(DebugProg->getUniform("invP"), 1, GL_FALSE, value_ptr(invP)));
+			CHECKED_GL_CALL(glUniformMatrix4fv(DebugProg->getUniform("invV"), 1, GL_FALSE, value_ptr(invV)));
 
 			CHECKED_GL_CALL(glBindVertexArray(QuadVertexArray));
 			CHECKED_GL_CALL(glDrawArrays(GL_TRIANGLES, 0, 6));
 			DebugProg->unbind();
+		}
+		else
+		{
+			// Lighting mode
+
+			LightProg->bind();
+
+			CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0));
+			CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SceneColorTexture));
+			CHECKED_GL_CALL(glUniform1i(LightProg->getUniform("sceneColorTex"), 0));
+
+			CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE1));
+			CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SceneNormalsTexture));
+			CHECKED_GL_CALL(glUniform1i(LightProg->getUniform("sceneNormalsTex"), 1));
+
+			CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE2));
+			CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SceneDepthTexture));
+			CHECKED_GL_CALL(glUniform1i(LightProg->getUniform("sceneDepthTex"), 2));
+
+			mat4 P = SetProjectionMatrix(LightProg);
+			mat4 V = SetView(LightProg);
+			SetModel(vec3(0, 0, 0), 0, 7.f, LightProg);
+			CHECKED_GL_CALL(glUniform3f(LightProg->getUniform("lightColor"), 1.f, 1.f, 1.f));
+			CHECKED_GL_CALL(glUniform3f(LightProg->getUniform("lightPosition"), 0.f, 0.f, 0.f));
+
+			mat4 invP = inverse(P);
+			mat4 invV = inverse(V);
+			CHECKED_GL_CALL(glUniformMatrix4fv(LightProg->getUniform("invP"), 1, GL_FALSE, value_ptr(invP)));
+			CHECKED_GL_CALL(glUniformMatrix4fv(LightProg->getUniform("invV"), 1, GL_FALSE, value_ptr(invV)));
+
+			glEnable(GL_CULL_FACE);
+			glCullFace(GL_FRONT);
+			glDisable(GL_DEPTH_TEST);
+			sphere->draw(LightProg);
+			glEnable(GL_DEPTH_TEST);
+			glDisable(GL_CULL_FACE);
+
+			LightProg->unbind();
 		}
 	}
 
