@@ -57,6 +57,6 @@ void main()
 	else if (uMode == 4) // Debug Position
 	{
 		vec3 world = reconstructWorldspacePosition(texCoord);
-		color.rgb = mod(world, vec3(1.0));
+		color.rgb = mod(world + vec3(0.0, 0.5, 0.0), vec3(1.0));
 	}
 }

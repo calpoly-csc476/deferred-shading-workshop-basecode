@@ -37,6 +37,9 @@ class Application : public EventCallbacks
 
 public:
 
+	const int NumLights = 100;
+	const int NumTrees = 25;
+
 	WindowManager * windowManager = nullptr;
 
 	// Shaders
@@ -83,7 +86,6 @@ public:
 		float T;
 	};
 
-	const int NumLights = 100;
 	vector<Light> Lights;
 
 
@@ -108,7 +110,7 @@ public:
 	bool moveBack = false;
 	bool moveLeft = false;
 	bool moveRight = false;
-	vec3 cameraPos = vec3(0, 0, 8);
+	vec3 cameraPos = vec3(0, 1.5f, 8);
 	float cameraMoveSpeed = 12.0f;
 
 
@@ -224,7 +226,7 @@ public:
 	void initGround()
 	{
 		const float groundSize = 200;
-		const float groundY = -1.5;
+		const float groundY = 0;
 
 		// A x-z plane at y = g_groundY of dimension [-g_groundSize, g_groundSize]^2
 		const float GrndPos[] =
@@ -530,7 +532,7 @@ public:
 		for (int i = 0; i < NumLights; ++ i)
 		{
 			Light l;
-			l.Position = vec3(nrand() * 30.f, frand() * 0.5f, nrand() * 30.f);
+			l.Position = vec3(nrand() * 30.f, 1.5f + frand() * 0.5f, nrand() * 30.f);
 			l.Color = HSV(frand(), 1.f, 1.f);
 			l.T = frand() * 6.28f;
 			Lights.push_back(l);
@@ -592,22 +594,22 @@ public:
 		SetView(SceneProg);
 
 		// draw the dog mesh
-		SetModel(vec3(-1, -0.75f, 0), 0, 1, SceneProg);
+		SetModel(vec3(-1, 0.75f, 0), 0, 1, SceneProg);
 		CHECKED_GL_CALL(glUniform3f(SceneProg->getUniform("materialColor"), 0.8f, 0.2f, 0.2f));
 		dog->draw(SceneProg);
 
 		// draw the sphere mesh
-		SetModel(vec3(1, -1, 0), 0, 1, SceneProg);
+		SetModel(vec3(1, 0.5f, 0), 0, 1, SceneProg);
 		CHECKED_GL_CALL(glUniform3f(SceneProg->getUniform("materialColor"), 0.2f, 0.2f, 0.8f));
 		sphere->draw(SceneProg);
 
 		// draw the dragon mesh
-		SetModel(vec3(-1, 0.5f, -4), radians(90.f), 3, SceneProg);
+		SetModel(vec3(-1, 2.f, -4), radians(90.f), 3, SceneProg);
 		CHECKED_GL_CALL(glUniform3f(SceneProg->getUniform("materialColor"), 0.2f, 0.8f, 0.8f));
 		dragon->draw(SceneProg);
 
 		// draw the stairs mesh
-		SetModel(vec3(1, 1, -9), radians(180.f), 3, SceneProg);
+		SetModel(vec3(1, 2.5f, -9), radians(180.f), 3, SceneProg);
 		CHECKED_GL_CALL(glUniform3f(SceneProg->getUniform("materialColor"), 0.8f, 0.6f, 0.2f));
 		stairs->draw(SceneProg);
 
@@ -627,9 +629,20 @@ public:
 		SetView(SceneTexProg);
 
 		// draw trees
-		SetModel(vec3(10, -0.5f, 0), 0, 5, SceneProg);
 		treeTexture->bind(SceneTexProg->getUniform("materialTex"));
-		tree->draw(SceneTexProg);
+		srand(200);
+		for (int i = 0; i < NumTrees; ++ i)
+		{
+			const float angle = 3.14159f * 2 * frand();
+			const float theta = 3.14159f * 2 * (float) i / (float) NumTrees  + frand() * 0.5f;
+			const float radius = 13.f + 22.f * frand();
+			const float scale = 7.f + 6.f * frand();
+
+			const vec3 Pos = vec3(cos(theta) * radius, scale, sin(theta) * radius);
+
+			SetModel(Pos, angle, scale, SceneProg);
+			tree->draw(SceneTexProg);
+		}
 
 		SceneTexProg->unbind();
 	}
