@@ -747,18 +747,6 @@ public:
 
 			LightProg->bind();
 
-			CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0));
-			CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SceneColorTexture));
-			CHECKED_GL_CALL(glUniform1i(LightProg->getUniform("sceneColorTex"), 0));
-
-			CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE1));
-			CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SceneNormalsTexture));
-			CHECKED_GL_CALL(glUniform1i(LightProg->getUniform("sceneNormalsTex"), 1));
-
-			CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE2));
-			CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SceneDepthTexture));
-			CHECKED_GL_CALL(glUniform1i(LightProg->getUniform("sceneDepthTex"), 2));
-
 			mat4 P = SetProjectionMatrix(LightProg);
 			mat4 V = SetView(LightProg);
 
@@ -768,19 +756,10 @@ public:
 			CHECKED_GL_CALL(glUniformMatrix4fv(LightProg->getUniform("invV"), 1, GL_FALSE, value_ptr(invV)));
 			CHECKED_GL_CALL(glUniform3f(LightProg->getUniform("cameraPos"), cameraPos.x, cameraPos.y, cameraPos.z));
 
-			// Blend mode for additive
-			glEnable(GL_BLEND);
-			glBlendEquation(GL_FUNC_ADD);
-			glBlendFunc(GL_ONE, GL_ONE);
+			// [TO DO] Anything else we need to pass to the light pass?
 
-			// Culling for 3D spheres - want 2D coverage
-			glEnable(GL_CULL_FACE);
-			glCullFace(GL_FRONT);
+			// [TO DO] Any rendering settings we need to turn on?
 			
-			// No depth - light volumes shouldn't block other lights
-			glDisable(GL_DEPTH_TEST);
-
-
 			for (int i = 0; i < Lights.size(); ++ i)
 			{
 				vec3 Pos = Lights[i].Position + vec3(
@@ -788,16 +767,11 @@ public:
 					sin(t1 + Lights[i].T),
 					sin(0.2f * t1 + Lights[i].T) * 5.f);
 
-				SetModel(Pos, 0, 18.f, LightProg);
+				SetModel(Pos, 0, 0.5f, LightProg);
 				CHECKED_GL_CALL(glUniform3f(LightProg->getUniform("lightPos"), Pos.x, Pos.y, Pos.z));
 				CHECKED_GL_CALL(glUniform3f(LightProg->getUniform("lightColor"), Lights[i].Color.x, Lights[i].Color.y, Lights[i].Color.z));
 				sphere->draw(LightProg);
 			}
-
-			// Reset state
-			glEnable(GL_DEPTH_TEST);
-			glDisable(GL_CULL_FACE);
-			glDisable(GL_BLEND);
 
 			LightProg->unbind();
 		}
