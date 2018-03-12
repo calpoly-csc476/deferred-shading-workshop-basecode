@@ -12,9 +12,6 @@ in vec3 fNormal;
 
 void main()
 {
-	float ambient = 0.3;
-	float diffuse = 0.7;
-
 	outColor = materialColor;
 	outNormal = normalize(fNormal) * 0.5 + 0.5;
 }
