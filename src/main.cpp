@@ -227,7 +227,7 @@ public:
 	// Create the ground plane
 	void initGround()
 	{
-		const float groundSize = 20;
+		const float groundSize = 200;
 		const float groundY = -1.5;
 
 		// A x-z plane at y = g_groundY of dimension [-g_groundSize, g_groundSize]^2
@@ -414,7 +414,7 @@ public:
 		glfwGetFramebufferSize(windowManager->getHandle(), &g_width, &g_height);
 
 		// Set background color
-		glClearColor(0.5f, 0.5f, 1.0f, 1.0f);
+		glClearColor(0.f, 0.f, 0.f, 1.0f);
 		// Enable z-buffer test
 		glEnable(GL_DEPTH_TEST);
 
@@ -484,9 +484,10 @@ public:
 		LightProg->addUniform("V");
 		LightProg->addUniform("M");
 		LightProg->addUniform("lightColor");
-		LightProg->addUniform("lightPosition");
+		LightProg->addUniform("lightPos");
 		LightProg->addUniform("invP");
 		LightProg->addUniform("invV");
+		LightProg->addUniform("cameraPos");
 		LightProg->addAttribute("vertPos");
 
 		DebugProg->addUniform("sceneColorTex");
@@ -504,6 +505,7 @@ public:
 		///////////////////////
 
 
+		srand(100);
 		for (int i = 0; i < NumLights; ++ i)
 		{
 			Light l;
@@ -526,7 +528,7 @@ public:
 		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
 		float aspect = width / (float) height;
 
-		mat4 Projection = perspective(radians(50.0f), aspect, 0.1f, 100.0f);
+		mat4 Projection = perspective(radians(50.0f), aspect, 0.1f, 200.0f);
 		
 		if (curShade)
 		{
@@ -592,7 +594,7 @@ public:
 
 		// draw the ground plane
 		SetModel(vec3(0, 0, 0), 0, 1, SceneProg);
-		CHECKED_GL_CALL(glUniform3f(SceneProg->getUniform("materialColor"), 0.2f, 0.8f, 0.2f));
+		CHECKED_GL_CALL(glUniform3f(SceneProg->getUniform("materialColor"), 0.8f, 0.8f, 0.8f));
 		CHECKED_GL_CALL(glBindVertexArray(GroundVertexArray));
 		CHECKED_GL_CALL(glDrawElements(GL_TRIANGLES, GroundIndexCount, GL_UNSIGNED_SHORT, 0));
 		CHECKED_GL_CALL(glBindVertexArray(0));
@@ -600,12 +602,8 @@ public:
 		SceneProg->unbind();
 	}
 
-	void UpdateCamera()
+	void UpdateCamera(float const dT)
 	{
-		float t1 = (float) glfwGetTime();
-
-		float const dT = (t1 - t0);
-		t0 = t1;
 
 		glm::vec3 up = glm::vec3(0, 1, 0);
 		glm::vec3 forward = glm::vec3(cos(cTheta) * cos(cPhi), sin(cPhi), sin(cTheta) * cos(cPhi));
@@ -626,7 +624,12 @@ public:
 	/* let's draw */
 	void render()
 	{
-		UpdateCamera();
+		float t1 = (float) glfwGetTime();
+
+		float const dT = (t1 - t0);
+		t0 = t1;
+
+		UpdateCamera(dT);
 
 
 		// First render the scene into the gbuffer
@@ -712,21 +715,43 @@ public:
 
 			mat4 P = SetProjectionMatrix(LightProg);
 			mat4 V = SetView(LightProg);
-			SetModel(vec3(0, 0, 0), 0, 7.f, LightProg);
-			CHECKED_GL_CALL(glUniform3f(LightProg->getUniform("lightColor"), 1.f, 1.f, 1.f));
-			CHECKED_GL_CALL(glUniform3f(LightProg->getUniform("lightPosition"), 0.f, 0.f, 0.f));
 
 			mat4 invP = inverse(P);
 			mat4 invV = inverse(V);
 			CHECKED_GL_CALL(glUniformMatrix4fv(LightProg->getUniform("invP"), 1, GL_FALSE, value_ptr(invP)));
 			CHECKED_GL_CALL(glUniformMatrix4fv(LightProg->getUniform("invV"), 1, GL_FALSE, value_ptr(invV)));
+			CHECKED_GL_CALL(glUniform3f(LightProg->getUniform("cameraPos"), cameraPos.x, cameraPos.y, cameraPos.z));
 
+			// Blend mode for additive
+			glEnable(GL_BLEND);
+			glBlendEquation(GL_FUNC_ADD);
+			glBlendFunc(GL_ONE, GL_ONE);
+
+			// Culling for 3D spheres - want 2D coverage
 			glEnable(GL_CULL_FACE);
 			glCullFace(GL_FRONT);
+			
+			// No depth - light volumes shouldn't block other lights
 			glDisable(GL_DEPTH_TEST);
-			sphere->draw(LightProg);
+
+
+			for (int i = 0; i < Lights.size(); ++ i)
+			{
+				vec3 Pos = Lights[i].Position + vec3(
+					cos(0.2f * t1 + Lights[i].T) * 5.f,
+					sin(t1 + Lights[i].T),
+					sin(0.2f * t1 + Lights[i].T) * 5.f);
+
+				SetModel(Pos, 0, 18.f, LightProg);
+				CHECKED_GL_CALL(glUniform3f(LightProg->getUniform("lightPos"), Pos.x, Pos.y, Pos.z));
+				CHECKED_GL_CALL(glUniform3f(LightProg->getUniform("lightColor"), Lights[i].Color.x, Lights[i].Color.y, Lights[i].Color.z));
+				sphere->draw(LightProg);
+			}
+
+			// Reset state
 			glEnable(GL_DEPTH_TEST);
 			glDisable(GL_CULL_FACE);
+			glDisable(GL_BLEND);
 
 			LightProg->unbind();
 		}
