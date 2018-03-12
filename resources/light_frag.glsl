@@ -2,6 +2,9 @@
 
 uniform sampler2D Texture0;
 
+in vec3 fNormal;
+in vec3 fWorldPos;
+
 layout(location = 0) out vec3 outColor;
 
 // Light Properties

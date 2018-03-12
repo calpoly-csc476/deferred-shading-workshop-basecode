@@ -512,6 +512,7 @@ public:
 		LightProg->addUniform("invV");
 		LightProg->addUniform("cameraPos");
 		LightProg->addAttribute("vertPos");
+		LightProg->addAttribute("vertNor");
 
 		DebugProg->addUniform("sceneColorTex");
 		DebugProg->addUniform("sceneNormalsTex");
