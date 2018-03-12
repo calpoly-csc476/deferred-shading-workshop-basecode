@@ -15,22 +15,17 @@ Texture::Texture() :
 
 }
 
-Texture::~Texture()
-{
-
-}
-
 void Texture::init()
 {
 	// Load texture
-	int w, h, ncomps;
+	int w = 0, h = 0, ncomps = 0;
 	stbi_set_flip_vertically_on_load(true);
 	unsigned char *data = stbi_load(filename.c_str(), &w, &h, &ncomps, 0);
 	if (!data) {
 		cerr << filename << " not found" << endl;
 	}
-	if (ncomps != 3) {
-		cerr << filename << " must have 3 components (RGB)" << endl;
+	if (ncomps < 3 || ncomps > 4) {
+		cerr << filename << " must have 3 or 4 components (RGB or RGBA)" << endl;
 	}
 	if ((w & (w - 1)) != 0 || (h & (h - 1)) != 0) {
 		cerr << filename << " must be a power of 2" << endl;
@@ -40,19 +35,25 @@ void Texture::init()
 
 	// Generate a texture buffer object
 	CHECKED_GL_CALL(glGenTextures(1, &tid));
+
 	// Bind the current texture to be the newly generated texture object
 	CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, tid));
+
 	// Load the actual texture data
 	// Base level is 0, number of channels is 3, and border is 0.
-	CHECKED_GL_CALL(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data));
+	CHECKED_GL_CALL(glTexImage2D(GL_TEXTURE_2D, 0, (ncomps == 3 ? GL_RGB : GL_RGBA), width, height, 0, (ncomps == 3 ? GL_RGB : GL_RGBA), GL_UNSIGNED_BYTE, data));
+
 	// Generate image pyramid
 	CHECKED_GL_CALL(glGenerateMipmap(GL_TEXTURE_2D));
+
 	// Set texture wrap modes for the S and T directions
 	CHECKED_GL_CALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
 	CHECKED_GL_CALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
+
 	// Set filtering mode for magnification and minimification
 	CHECKED_GL_CALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
 	CHECKED_GL_CALL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
+
 	// Unbind
 	CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, 0));
 	// Free image, since the data is now on the GPU
