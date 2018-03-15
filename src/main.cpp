@@ -756,7 +756,17 @@ public:
 			CHECKED_GL_CALL(glUniformMatrix4fv(LightProg->getUniform("invV"), 1, GL_FALSE, value_ptr(invV)));
 			CHECKED_GL_CALL(glUniform3f(LightProg->getUniform("cameraPos"), cameraPos.x, cameraPos.y, cameraPos.z));
 
-			// [TO DO] Anything else we need to pass to the light pass?
+			CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE0));
+			CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SceneColorTexture));
+			CHECKED_GL_CALL(glUniform1i(LightProg->getUniform("sceneColorTex"), 0));
+
+			CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE1));
+			CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SceneNormalsTexture));
+			CHECKED_GL_CALL(glUniform1i(LightProg->getUniform("sceneNormalsTex"), 1));
+
+			CHECKED_GL_CALL(glActiveTexture(GL_TEXTURE2));
+			CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SceneDepthTexture));
+			CHECKED_GL_CALL(glUniform1i(LightProg->getUniform("sceneDepthTex"), 2));
 
 			// [TO DO] Any rendering settings we need to turn on?
 			
