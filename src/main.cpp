@@ -787,7 +787,7 @@ public:
 					sin(t1 + Lights[i].T),
 					sin(0.2f * t1 + Lights[i].T) * 5.f);
 
-				SetModel(Pos, 0, 0.5f, LightProg);
+				SetModel(Pos, 0, 18.f, LightProg);
 				CHECKED_GL_CALL(glUniform3f(LightProg->getUniform("lightPos"), Pos.x, Pos.y, Pos.z));
 				CHECKED_GL_CALL(glUniform3f(LightProg->getUniform("lightColor"), Lights[i].Color.x, Lights[i].Color.y, Lights[i].Color.z));
 				sphere->draw(LightProg);
