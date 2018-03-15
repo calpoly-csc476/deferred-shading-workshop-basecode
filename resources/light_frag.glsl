@@ -16,6 +16,22 @@ uniform mat4 invP;
 uniform mat4 invV;
 uniform vec3 cameraPos;
 
+// G-Buffer
+uniform sampler2D sceneColorTex;
+uniform sampler2D sceneNormalsTex;
+uniform sampler2D sceneDepthTex;
+
+
+vec3 reconstructWorldspacePosition(vec2 texCoords)
+{
+	float depth = texture(sceneDepthTex, texCoords).r;
+	vec3 ndc = vec3(texCoords, depth) * 2.0 - vec3(1.0);
+	vec4 view = invP * vec4(ndc, 1.0);
+	view.xyz /= view.w;
+	vec4 world = invV * vec4(view.xyz, 1.0);
+	return world.xyz;
+}
+
 float raySphereIntersect(vec3 r0, vec3 rd, vec3 s0, float sr)
 {
 	// https://gist.github.com/wwwtyro/beecc31d65d1004f5a9d
@@ -42,11 +58,13 @@ void main()
 	const float diffuse = 0.7;
 	const float radius = 3.5;
 
-	vec3 materialColor = vec3(1.0);
-	vec3 normal = normalize(fNormal);
-	vec3 fragPos = fWorldPos;
+	vec2 texCoord = gl_FragCoord.xy / vec2(textureSize(sceneDepthTex, 0));
 
-	vec3 light = vec3(2.0, 9.0, 1.0);
+	vec3 materialColor = texture(sceneColorTex, texCoord).rgb;
+	vec3 normal = normalize(texture(sceneNormalsTex, texCoord).rgb * 2.0 - vec3(1.0));
+	vec3 fragPos = reconstructWorldspacePosition(texCoord);
+
+	vec3 light = lightPos - fragPos;
 	float distance = length(light);
 	float lambert = clamp(dot(normal, normalize(light)), 0.0, 1.0);
 	float attenuation = 1.0 / pow(1 + distance / radius, 2.0);
@@ -64,6 +82,6 @@ void main()
 	{
 		// Actual shading computation
 
-		outColor = (ambient + diffuse * lambert) * lightColor;
+		outColor = (diffuse * lambert * attenuation) * lightColor * materialColor;
 	}
 }
