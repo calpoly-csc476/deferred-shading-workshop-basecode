@@ -768,7 +768,17 @@ public:
 			CHECKED_GL_CALL(glBindTexture(GL_TEXTURE_2D, SceneDepthTexture));
 			CHECKED_GL_CALL(glUniform1i(LightProg->getUniform("sceneDepthTex"), 2));
 
-			// [TO DO] Any rendering settings we need to turn on?
+			// Blend mode for additive
+			glEnable(GL_BLEND);
+			glBlendEquation(GL_FUNC_ADD);
+			glBlendFunc(GL_ONE, GL_ONE);
+
+			// Culling for 3D spheres - want 2D coverage
+			glEnable(GL_CULL_FACE);
+			glCullFace(GL_FRONT);
+
+			// No depth - light volumes shouldn't block other lights
+			glDisable(GL_DEPTH_TEST);
 			
 			for (int i = 0; i < Lights.size(); ++ i)
 			{
@@ -782,6 +792,11 @@ public:
 				CHECKED_GL_CALL(glUniform3f(LightProg->getUniform("lightColor"), Lights[i].Color.x, Lights[i].Color.y, Lights[i].Color.z));
 				sphere->draw(LightProg);
 			}
+
+			// Reset state
+			glEnable(GL_DEPTH_TEST);
+			glDisable(GL_CULL_FACE);
+			glDisable(GL_BLEND);
 
 			LightProg->unbind();
 		}
